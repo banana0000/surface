@@ -88,6 +88,7 @@ def build_figure():
         )
     )
 
+    colorscales = ["Turbo", "Jet", "Viridis", "Hot", "Portland", "Earth"]
     fig.update_layout(
         title="☀️ Sun Heated Landscape",
         scene=dict(
@@ -98,6 +99,21 @@ def build_figure():
         ),
         margin=dict(l=0, r=0, b=0, t=40),
         height=750,
+        updatemenus=[
+            dict(
+                type="buttons",
+                direction="right",
+                showactive=True,
+                x=1,
+                y=1.1,
+                xanchor="right",
+                yanchor="top",
+                buttons=[
+                    dict(label=scale, method="restyle", args=[{"colorscale": scale}])
+                    for scale in colorscales
+                ],
+            )
+        ],
     )
     return fig
 
