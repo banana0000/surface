@@ -68,15 +68,25 @@ SUMMARY_TEXT = (
 # Surface figure
 # --------------------------
 
+COLORSCALES = ["Turbo", "Jet", "Viridis", "Hot", "Portland", "Earth"]
+
+
 @st.cache_resource
-def build_figure():
+def build_figure(colorscale, elevation_range):
+    z = np.where(
+        (ELEVATION >= elevation_range[0]) & (ELEVATION <= elevation_range[1]),
+        TEMP,
+        np.nan,
+    )
     fig = go.Figure(
         go.Surface(
             x=X,
             y=Y,
-            z=TEMP,
+            z=z,
             name="Sun Heated Landscape",
-            colorscale="Turbo",
+            colorscale=colorscale,
+            cmin=float(TEMP.min()),
+            cmax=float(TEMP.max()),
             hovertemplate=(
                 "<b>X</b>: %{x:.2f} km<br>"
                 "<b>Y</b>: %{y:.2f} km<br>"
@@ -88,37 +98,33 @@ def build_figure():
         )
     )
 
-    colorscales = ["Turbo", "Jet", "Viridis", "Hot", "Portland", "Earth"]
     fig.update_layout(
         title="☀️ Sun Heated Landscape",
         scene=dict(
             xaxis_title="East-West",
             yaxis_title="North-South",
             zaxis_title="Temperature",
+            zaxis=dict(range=[float(TEMP.min()), float(TEMP.max())]),
             camera=dict(eye=dict(x=1.7, y=1.7, z=0.9)),
         ),
         margin=dict(l=0, r=0, b=0, t=40),
         height=750,
-        updatemenus=[
-            dict(
-                type="buttons",
-                direction="right",
-                showactive=True,
-                x=1,
-                y=1.1,
-                xanchor="right",
-                yanchor="top",
-                buttons=[
-                    dict(label=scale, method="restyle", args=[{"colorscale": scale}])
-                    for scale in colorscales
-                ],
-            )
-        ],
     )
     return fig
 
 
-fig = build_figure()
+_dropdown_col, _, _, _ = st.columns(4)
+with _dropdown_col:
+    selected_colorscale = st.selectbox("Colorscale", COLORSCALES, index=0)
+
+elevation_range = st.slider(
+    "🏔️ Elevation slicer (m)",
+    float(ELEVATION.min()),
+    float(ELEVATION.max()),
+    (float(ELEVATION.min()), float(ELEVATION.max())),
+)
+
+fig = build_figure(selected_colorscale, elevation_range)
 
 
 # --------------------------
@@ -140,6 +146,43 @@ with main_col:
     st.markdown("---")
     st.subheader("Summary")
     st.write(SUMMARY_TEXT)
+
+    st.markdown("---")
+    st.subheader("✂️ Cross-section")
+
+    axis_col, slider_col = st.columns([1, 3])
+    with axis_col:
+        axis = st.selectbox("Axis", ["X (East-West)", "Y (North-South)"])
+    with slider_col:
+        if axis.startswith("X"):
+            fixed_value = st.slider("X value", float(x.min()), float(x.max()), 0.0)
+        else:
+            fixed_value = st.slider("Y value", float(y.min()), float(y.max()), 0.0)
+
+    if axis.startswith("X"):
+        idx = int(np.abs(x - fixed_value).argmin())
+        section_x = y
+        section_temp = TEMP[:, idx]
+        section_title = f"Temperature along Y at X = {x[idx]:.1f} km"
+        section_xaxis = "North-South (km)"
+    else:
+        idx = int(np.abs(y - fixed_value).argmin())
+        section_x = x
+        section_temp = TEMP[idx, :]
+        section_title = f"Temperature along X at Y = {y[idx]:.1f} km"
+        section_xaxis = "East-West (km)"
+
+    section_fig = go.Figure(
+        go.Scatter(x=section_x, y=section_temp, mode="lines", line=dict(color="#ff6b35", width=3))
+    )
+    section_fig.update_layout(
+        title=section_title,
+        xaxis_title=section_xaxis,
+        yaxis_title="Temperature (°C)",
+        height=350,
+        margin=dict(l=0, r=0, b=0, t=40),
+    )
+    st.plotly_chart(section_fig, use_container_width=True)
 
 with side_col:
     st.markdown(
